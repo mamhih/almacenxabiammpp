@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Almacén FIFO</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --green:#1a9e6f; --green-light:#e6f7f1; --green-dark:#0d6b4a;
+  --amber:#e07b2a; --amber-light:#fef3e8;
+  --red:#d94040; --red-light:#fdeaea;
+  --bg:#f4f5f0; --surface:#ffffff; --border:#e0e2d8;
+  --text:#1a1c18; --muted:#6b6f64;
+  --mono:'DM Mono',monospace; --sans:'DM Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;display:flex;justify-content:center}
+.phone{width:100%;max-width:430px;min-height:100vh;background:var(--bg);display:flex;flex-direction:column}
+
+/* LOGIN */
+.login-wrap{position:fixed;inset:0;background:var(--green-dark);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;padding:32px 24px}
+.login-card{background:white;border-radius:20px;padding:24px;width:100%;max-width:340px;display:flex;flex-direction:column;gap:14px}
+.pin-display{display:flex;gap:12px;justify-content:center;margin:4px 0}
+.pin-dot{width:16px;height:16px;border-radius:50%;background:var(--border);transition:background 0.15s}
+.pin-dot.filled{background:var(--green)}
+.pin-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pin-btn{padding:16px;border:1px solid var(--border);border-radius:12px;font-size:22px;font-weight:600;background:var(--bg);color:var(--text);cursor:pointer;font-family:var(--sans);transition:all 0.1s}
+.pin-btn:active{background:var(--green-light);border-color:var(--green)}
+
+/* HEADER */
+.header{background:var(--green-dark);padding:14px 16px 12px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100}
+.header h1{font-size:16px;font-weight:600;color:white;flex:1}
+.header-sub{font-size:11px;color:rgba(255,255,255,0.6);font-family:var(--mono)}
+.user-chip{background:rgba(255,255,255,0.2);border-radius:20px;padding:4px 10px;font-size:12px;color:white;font-weight:500}
+
+/* NAV */
+.nav{display:flex;background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:58px;z-index:99}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 4px;border:none;background:transparent;cursor:pointer;color:var(--muted);font-family:var(--sans);font-size:10px;font-weight:500;border-bottom:2px solid transparent;transition:all 0.15s}
+.nav-btn svg{width:19px;height:19px}
+.nav-btn.active{color:var(--green);border-bottom-color:var(--green)}
+
+/* SCREENS */
+.screen{display:none;flex:1;padding:14px;flex-direction:column;gap:12px}
+.screen.active{display:flex}
+
+/* CARD */
+.card{background:var(--surface);border-radius:14px;border:1px solid var(--border);overflow:hidden}
+.card-head{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.card-head svg{width:15px;height:15px;color:var(--green)}
+.card-head span{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted)}
+.card-body{padding:14px}
+
+/* FORM */
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);display:flex;align-items:center;gap:6px}
+.field input,.field textarea{border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:var(--mono);background:var(--bg);color:var(--text);transition:border-color 0.15s;width:100%}
+.field input:focus,.field textarea:focus{outline:none;border-color:var(--green);background:var(--surface)}
+.field input.ai{border-color:var(--green);background:var(--green-light);color:var(--green-dark)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ai-tag{font-size:10px;color:var(--green);font-weight:600;background:var(--green-light);padding:1px 6px;border-radius:10px}
+
+/* SCAN */
+.scan-box{border:1.5px dashed var(--border);border-radius:12px;padding:20px 16px;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;background:var(--bg);transition:all 0.15s}
+.scan-box:active{background:var(--green-light);border-color:var(--green)}
+.scan-box svg{width:32px;height:32px;color:var(--green)}
+.scan-box .lbl{font-size:14px;font-weight:500}
+.scan-box .sub{font-size:11px;color:var(--muted);text-align:center}
+.scan-badge{font-size:11px;background:var(--green-light);color:var(--green-dark);padding:3px 10px;border-radius:20px;font-weight:500}
+
+/* STEPS */
+.steps{display:flex;gap:6px}
+.step{flex:1;height:3px;border-radius:2px;background:var(--border)}
+.step.done{background:var(--green)}
+.step.act{background:#9fd9c4}
+
+/* BUTTONS */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;border:none;border-radius:12px;font-size:15px;font-weight:600;font-family:var(--sans);cursor:pointer;transition:all 0.15s}
+.btn-green{background:var(--green);color:white}
+.btn-green:hover{background:var(--green-dark)}
+.btn-green:disabled{background:var(--border);color:var(--muted);cursor:default}
+.btn-amber{background:var(--amber);color:white}
+.btn-red{background:var(--red);color:white}
+.btn-ghost{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn svg{width:16px;height:16px}
+
+/* ALERTS */
+.alert{display:none;align-items:center;gap:10px;border-radius:12px;padding:11px 14px;font-size:13px;font-weight:500}
+.alert svg{width:17px;height:17px;flex-shrink:0}
+.alert-ok{background:var(--green-light);color:var(--green-dark);border:1px solid #9fd9c4}
+.alert-err{background:var(--red-light);color:var(--red);border:1px solid #f5aaaa}
+
+/* AI SPINNER */
+.ai-spin{display:none;flex-direction:column;align-items:center;gap:10px;padding:18px}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* FIFO RESULTS */
+.fifo-card{border-radius:14px;border:1px solid var(--border);overflow:hidden;margin-bottom:10px}
+.fifo-top{padding:11px 14px;display:flex;align-items:center;gap:8px}
+.fifo-top.first{background:var(--green)}
+.fifo-top.next{background:var(--green-light)}
+.fifo-badge{font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:3px 8px;border-radius:20px}
+.fifo-top.first .fifo-badge{background:rgba(255,255,255,0.25);color:white}
+.fifo-top.next .fifo-badge{background:#9fd9c4;color:var(--green-dark)}
+.fifo-name{font-size:13px;font-weight:600}
+.fifo-top.first .fifo-name{color:white}
+.fifo-top.next .fifo-name{color:var(--green-dark)}
+.fifo-body{background:var(--surface)}
+.fifo-row{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-bottom:1px solid var(--border);font-size:13px}
+.fifo-row:last-child{border-bottom:none}
+.fifo-row .lbl{color:var(--muted);display:flex;align-items:center;gap:5px}
+.fifo-row .lbl svg{width:12px;height:12px}
+.fifo-row .val{font-family:var(--mono);font-size:12px;font-weight:500}
+.fifo-actions{display:flex;gap:8px;padding:10px 14px}
+.btn-move{flex:1;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:5px}
+.btn-consume{flex:1;padding:8px;background:var(--red-light);border:1px solid #f5aaaa;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans);color:var(--red);display:flex;align-items:center;justify-content:center;gap:5px}
+
+/* HISTORIAL */
+.hist-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.hist-item:last-child{border-bottom:none}
+.hist-icon{width:34px;height:34px;border-radius:10px;background:var(--green-light);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.hist-icon svg{width:15px;height:15px;color:var(--green)}
+.hist-top{font-size:13px;font-weight:600}
+.hist-bot{font-size:11px;color:var(--muted);margin-top:2px;font-family:var(--mono)}
+.hist-right{font-size:10px;color:var(--muted);text-align:right;white-space:nowrap}
+
+/* KANBAN */
+.k-card{background:var(--surface);border-radius:12px;border:1px solid var(--border);margin-bottom:10px;overflow:hidden}
+.k-top{padding:10px 14px;display:flex;align-items:center;gap:8px}
+.k-top.pend{background:var(--amber-light);border-bottom:1px solid #f0c090}
+.k-top.done{background:var(--green-light);border-bottom:1px solid #9fd9c4}
+.k-badge{font-size:10px;font-weight:700;text-transform:uppercase;padding:3px 8px;border-radius:20px}
+.k-top.pend .k-badge{background:var(--amber);color:white}
+.k-top.done .k-badge{background:var(--green);color:white}
+.k-code{font-size:14px;font-weight:700;font-family:var(--mono)}
+.k-top.pend .k-code{color:#7a3d0a}
+.k-top.done .k-code{color:var(--green-dark)}
+.k-body{padding:10px 14px;display:flex;align-items:center;gap:8px;font-size:13px}
+.k-comment{flex:1;color:var(--muted)}
+.k-user{font-size:11px;color:var(--muted)}
+.btn-done{padding:6px 12px;background:var(--green);color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+.empty{text-align:center;padding:28px 16px;color:var(--muted);font-size:13px}
+.empty svg{width:36px;height:36px;color:var(--border);margin:0 auto 8px;display:block}
+.sec-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted)}
+
+/* CONFIG */
+.user-item{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.user-item:last-child{border-bottom:none}
+.u-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:white;flex-shrink:0}
+.u-name{font-size:13px;font-weight:600}
+.u-role{font-size:11px;color:var(--muted)}
+.badge-admin{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;background:#fde8e8;color:var(--red)}
+.badge-user{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:20px;background:var(--green-light);color:var(--green-dark)}
+.btn-del{padding:4px 10px;background:var(--red-light);color:var(--red);border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer}
+.stat-box{background:var(--bg);border-radius:10px;padding:12px;text-align:center}
+.stat-num{font-size:24px;font-weight:700}
+.stat-lbl{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* MODAL */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:none;align-items:flex-end;justify-content:center}
+.modal.open{display:flex}
+.modal-box{background:var(--surface);border-radius:20px 20px 0 0;padding:22px 20px 32px;width:100%;max-width:430px;display:flex;flex-direction:column;gap:14px}
+.modal-title{font-size:16px;font-weight:700}
+.modal-sub{font-size:12px;color:var(--muted);margin-top:-8px}
+.modal-btns{display:flex;gap:10px;margin-top:4px}
+
+/* SEARCH */
+.search-wrap{display:flex;gap:8px}
+.search-wrap input{flex:1;border:1px solid var(--border);border-radius:10px;padding:11px 14px;font-size:14px;font-family:var(--mono);background:var(--surface);color:var(--text)}
+.search-wrap input:focus{outline:none;border-color:var(--green)}
+.search-wrap button{padding:11px 14px;background:var(--green);color:white;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center}
+.search-wrap button svg{width:18px;height:18px}
+
+/* CAMERA */
+.cam-wrap{position:fixed;inset:0;background:#000;z-index:500;display:none;flex-direction:column}
+.cam-wrap.open{display:flex}
+.cam-view{flex:1;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+#cam-video{width:100%;height:100%;object-fit:cover}
+.cam-frame{position:absolute;width:80%;max-width:300px;aspect-ratio:3/2;border:2px solid rgba(255,255,255,0.7);border-radius:12px}
+.cam-corner{position:absolute;width:20px;height:20px}
+.cam-corner.tl{top:-2px;left:-2px;border-top:3px solid var(--green);border-left:3px solid var(--green);border-radius:4px 0 0 0}
+.cam-corner.tr{top:-2px;right:-2px;border-top:3px solid var(--green);border-right:3px solid var(--green);border-radius:0 4px 0 0}
+.cam-corner.bl{bottom:-2px;left:-2px;border-bottom:3px solid var(--green);border-left:3px solid var(--green);border-radius:0 0 0 4px}
+.cam-corner.br{bottom:-2px;right:-2px;border-bottom:3px solid var(--green);border-right:3px solid var(--green);border-radius:0 0 4px 0}
+.cam-prog-wrap{position:absolute;bottom:-28px;left:0;right:0;height:5px;background:rgba(255,255,255,0.2);border-radius:10px;overflow:hidden}
+.cam-prog{height:100%;background:var(--green);width:0%;transition:width 0.05s linear;border-radius:10px}
+.cam-hint{position:absolute;bottom:72px;left:0;right:0;text-align:center}
+.cam-hint span{background:rgba(0,0,0,0.6);color:white;font-size:13px;padding:6px 14px;border-radius:20px}
+.cam-bar{background:#000;padding:18px 24px 30px;display:flex;align-items:center;justify-content:space-between}
+.cam-close{background:rgba(255,255,255,0.15);border:none;border-radius:50%;width:46px;height:46px;color:white;font-size:18px;cursor:pointer}
+.cam-shoot{background:white;border:none;border-radius:50%;width:62px;height:62px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.cam-shoot-inner{width:50px;height:50px;border-radius:50%;background:var(--green)}
+.cam-status{color:rgba(255,255,255,0.7);font-size:12px;text-align:center}
+
+/* UBICACION GRID */
+.ubi-btn {
+  padding: 14px 4px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--mono);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ubi-btn:active { background: var(--green-light); border-color: var(--green); color: var(--green-dark); }
+.ubi-btn.selected { background: var(--green); border-color: var(--green); color: white; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="login-wrap">
+  <div style="margin-bottom:20px;text-align:center">
+    <div style="width:60px;height:60px;background:rgba(255,255,255,0.15);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px">
+      <svg viewBox="0 0 24 24" fill="white" style="width:32px;height:32px"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM4 5h16a1 1 0 011 1v1H3V6a1 1 0 011-1z"/></svg>
+    </div>
+    <div style="font-size:22px;font-weight:700;color:white">Almacén FIFO</div>
+    <div style="font-size:13px;color:rgba(255,255,255,0.6);margin-top:4px">Introduce tu PIN</div>
+  </div>
+  <div class="login-card">
+    <div class="pin-display">
+      <div class="pin-dot" id="pd0"></div>
+      <div class="pin-dot" id="pd1"></div>
+      <div class="pin-dot" id="pd2"></div>
+      <div class="pin-dot" id="pd3"></div>
+    </div>
+    <div class="pin-pad">
+      <button class="pin-btn" onclick="pinPress('1')">1</button>
+      <button class="pin-btn" onclick="pinPress('2')">2</button>
+      <button class="pin-btn" onclick="pinPress('3')">3</button>
+      <button class="pin-btn" onclick="pinPress('4')">4</button>
+      <button class="pin-btn" onclick="pinPress('5')">5</button>
+      <button class="pin-btn" onclick="pinPress('6')">6</button>
+      <button class="pin-btn" onclick="pinPress('7')">7</button>
+      <button class="pin-btn" onclick="pinPress('8')">8</button>
+      <button class="pin-btn" onclick="pinPress('9')">9</button>
+      <button class="pin-btn" onclick="pinPress('')" style="opacity:0"></button>
+      <button class="pin-btn" onclick="pinPress('0')">0</button>
+      <button class="pin-btn" onclick="pinDel()" style="font-size:16px">⌫</button>
+    </div>
+    <div id="login-err" style="font-size:13px;color:var(--red);text-align:center;display:none">PIN incorrecto</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="phone">
+  <div class="header">
+    <svg viewBox="0 0 24 24" fill="white" style="width:22px;height:22px;flex-shrink:0"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM4 5h16a1 1 0 011 1v1H3V6a1 1 0 011-1z"/></svg>
+    <div style="flex:1">
+      <div style="font-size:16px;font-weight:600;color:white">Almacén FIFO <span style="font-size:10px;font-weight:500;color:rgba(255,255,255,0.5);font-family:var(--mono)">v3</span></div>
+      <div id="hdr-user" style="font-size:11px;color:rgba(255,255,255,0.6)">—</div>
+    </div>
+    <div onclick="syncNow()" style="cursor:pointer;text-align:center;margin-right:4px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" style="width:18px;height:18px;opacity:0.8"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+      <div id="sync-lbl" style="font-size:9px;color:rgba(255,255,255,0.5)">sync</div>
+    </div>
+    <button onclick="logout()" title="Cerrar sesión" style="background:rgba(255,255,255,0.15);border:none;border-radius:8px;padding:6px 10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" style="width:17px;height:17px"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+      <span style="font-size:9px;color:rgba(255,255,255,0.7)">salir</span>
+    </button>
+  </div>
+
+  <div class="nav">
+    <button class="nav-btn active" id="nb-reg" onclick="goScreen('reg',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Registrar
+    </button>
+    <button class="nav-btn" id="nb-bus" onclick="goScreen('bus',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>Buscar
+    </button>
+    <button class="nav-btn" id="nb-his" onclick="goScreen('his',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Historial
+    </button>
+    <button class="nav-btn" id="nb-kan" onclick="goScreen('kan',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="5" height="15" rx="1"/></svg>Kanban
+    </button>
+    <button class="nav-btn" id="nb-cfg" onclick="goScreen('cfg',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 010 14.14M4.93 4.93a10 10 0 000 14.14"/></svg>Config
+    </button>
+  </div>
+
+  <!-- REGISTRAR -->
+  <div class="screen active" id="sc-reg">
+    <div class="steps">
+      <div class="step done"></div><div class="step act"></div><div class="step"></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <span>Paso 1 — Foto etiqueta IBC</span>
+      </div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+        <div class="scan-box" onclick="abrirCamara()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10" r="3"/></svg>
+          <span class="lbl">Escanear etiqueta</span>
+          <span class="sub">Enfoca la etiqueta — foto automática en 2 seg</span>
+          <span class="scan-badge">OCR.space — lectura automática</span>
+        </div>
+        <input type="file" id="cam-file" accept="image/*" capture="environment" onchange="onFileChange(event)" style="display:none">
+        <div class="ai-spin" id="ai-spin">
+          <div class="spinner"></div>
+          <p style="font-size:13px;color:var(--muted)">Leyendo etiqueta con IA...</p>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Código MP <span class="ai-tag" id="tag-cod" style="display:none">IA</span></label>
+            <input type="text" id="f-cod" placeholder="0000" maxlength="6" oninput="checkBtn()">
+          </div>
+          <div class="field">
+            <label>Fecha recepción <span class="ai-tag" id="tag-fec" style="display:none">IA</span></label>
+            <input type="text" id="f-fec" placeholder="DD/MM/AAAA" oninput="checkBtn()">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3M17 14h3M14 17v3"/></svg>
+        <span>Paso 2 — Ubicación destino</span>
+      </div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:6px">Selecciona ubicación</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+          <button class="ubi-btn" onclick="selUbi('1')">1</button>
+          <button class="ubi-btn" onclick="selUbi('1b')">1b</button>
+          <button class="ubi-btn" onclick="selUbi('2')">2</button>
+          <button class="ubi-btn" onclick="selUbi('2b')">2b</button>
+          <button class="ubi-btn" onclick="selUbi('3')">3</button>
+          <button class="ubi-btn" onclick="selUbi('3b')">3b</button>
+          <button class="ubi-btn" onclick="selUbi('4')">4</button>
+          <button class="ubi-btn" onclick="selUbi('4b')">4b</button>
+          <button class="ubi-btn" onclick="selUbi('5')">5</button>
+          <button class="ubi-btn" onclick="selUbi('5b')">5b</button>
+          <button class="ubi-btn" onclick="selUbi('p2')">p2</button>
+          <button class="ubi-btn" onclick="selUbi('atx')">atx</button>
+        </div>
+        <input type="hidden" id="f-ubi">
+      </div>
+    </div>
+    <button class="btn btn-green" id="btn-save" onclick="guardar()" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+      Guardar y sincronizar
+    </button>
+    <div class="alert alert-ok" id="al-ok">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      Registro guardado y sincronizado
+    </div>
+    <div class="alert alert-err" id="al-err">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span id="al-err-msg">Error</span>
+    </div>
+  </div>
+
+  <!-- BUSCAR FIFO -->
+  <div class="screen" id="sc-bus" style="display:none">
+    <!-- Tabs -->
+    <div style="display:flex;gap:8px;margin-bottom:4px">
+      <button id="tab-cod" onclick="busTab('cod')" style="flex:1;padding:9px;border-radius:10px;border:none;font-size:13px;font-weight:600;font-family:var(--sans);cursor:pointer;background:var(--green);color:white">Por código MP</button>
+      <button id="tab-ubi" onclick="busTab('ubi')" style="flex:1;padding:9px;border-radius:10px;border:1px solid var(--border);font-size:13px;font-weight:600;font-family:var(--sans);cursor:pointer;background:var(--surface);color:var(--muted)">Por ubicación</button>
+    </div>
+
+    <!-- Buscar por código -->
+    <div id="bus-cod" style="display:flex;flex-direction:column;gap:12px">
+      <div class="search-wrap">
+        <input type="text" id="q-bus" placeholder="Código MP (ej: 1091)..." oninput="buscar()">
+        <button onclick="buscar()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        </button>
+      </div>
+      <div id="fifo-res"></div>
+    </div>
+
+    <!-- Buscar por ubicación -->
+    <div id="bus-ubi" style="display:none;flex-direction:column;gap:12px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:2px">Selecciona ubicación</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+        <button class="ubi-btn" onclick="selUbiSearch('1')">1</button>
+        <button class="ubi-btn" onclick="selUbiSearch('1b')">1b</button>
+        <button class="ubi-btn" onclick="selUbiSearch('2')">2</button>
+        <button class="ubi-btn" onclick="selUbiSearch('2b')">2b</button>
+        <button class="ubi-btn" onclick="selUbiSearch('3')">3</button>
+        <button class="ubi-btn" onclick="selUbiSearch('3b')">3b</button>
+        <button class="ubi-btn" onclick="selUbiSearch('4')">4</button>
+        <button class="ubi-btn" onclick="selUbiSearch('4b')">4b</button>
+        <button class="ubi-btn" onclick="selUbiSearch('5')">5</button>
+        <button class="ubi-btn" onclick="selUbiSearch('5b')">5b</button>
+        <button class="ubi-btn" onclick="selUbiSearch('p2')">p2</button>
+        <button class="ubi-btn" onclick="selUbiSearch('atx')">atx</button>
+      </div>
+      <div id="fifo-ubi-res"></div>
+    </div>
+
+  </div>
+
+  <!-- HISTORIAL -->
+  <div class="screen" id="sc-his" style="display:none">
+    <div class="sec-title">Últimos movimientos</div>
+    <div class="card"><div class="card-body" id="hist-body" style="padding:4px 14px"></div></div>
+  </div>
+
+  <!-- KANBAN -->
+  <div class="screen" id="sc-kan" style="display:none">
+
+    <!-- HOME -->
+    <div id="kan-home" style="display:flex;flex-direction:column;gap:14px;padding-top:8px">
+      <div style="font-size:13px;color:var(--muted);text-align:center">Selecciona una opción</div>
+      <button onclick="kanView('add')" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 16px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:10px;width:100%">
+        <div style="width:52px;height:52px;background:var(--amber-light);border-radius:14px;display:flex;align-items:center;justify-content:center">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2" style="width:26px;height:26px"><path d="M12 5v14M5 12h14"/></svg>
+        </div>
+        <div style="font-size:16px;font-weight:700;color:var(--text)">Añadir Kanban</div>
+        <div style="font-size:12px;color:var(--muted)">Crear nueva solicitud de reposición</div>
+      </button>
+      <button onclick="kanView('rep')" style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 16px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:10px;width:100%">
+        <div style="width:52px;height:52px;background:var(--green-light);border-radius:14px;display:flex;align-items:center;justify-content:center">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2" style="width:26px;height:26px"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        </div>
+        <div style="font-size:16px;font-weight:700;color:var(--text)">Reponer Kanban</div>
+        <div style="font-size:12px;color:var(--muted)">Ver pendientes y completarlos</div>
+        <span id="k-badge" style="background:var(--amber);color:white;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;display:none"></span>
+      </button>
+    </div>
+
+    <!-- AÑADIR -->
+    <div id="kan-add" style="display:none;flex-direction:column;gap:12px">
+      <button onclick="kanView('home')" style="display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;font-family:var(--sans);padding:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Volver
+      </button>
+      <div class="card">
+        <div class="card-head">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--amber)"><path d="M12 5v14M5 12h14"/></svg>
+          <span>Nueva solicitud</span>
+        </div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+          <div class="field"><label>Código MP</label><input type="text" id="k-cod" placeholder="Ej: 1091" maxlength="6" oninput="checkKanban()"></div>
+          <div class="field">
+            <label>Ubicación destino / comentario</label>
+            <textarea id="k-com" rows="3" placeholder="Ej: Zona-B3, segunda estantería..." oninput="checkKanban()" style="resize:none"></textarea>
+          </div>
+          <button class="btn btn-amber" id="k-btn" onclick="crearKanban()" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+            Enviar solicitud
+          </button>
+          <div class="alert alert-ok" id="k-ok">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Solicitud enviada
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- REPONER -->
+    <div id="kan-rep" style="display:none;flex-direction:column;gap:12px">
+      <button onclick="kanView('home')" style="display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;font-family:var(--sans);padding:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+        Volver
+      </button>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div class="sec-title">Pendientes</div>
+      </div>
+      <div id="k-pend"></div>
+      <div class="sec-title">Completadas hoy</div>
+      <div id="k-done"></div>
+    </div>
+
+  </div>
+
+    <!-- CONFIG -->
+  <div class="screen" id="sc-cfg" style="display:none">
+    <div class="sec-title">Mi sesión</div>
+    <div class="card">
+      <div class="card-body" style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div id="cfg-av" style="width:42px;height:42px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:white"></div>
+          <div>
+            <div id="cfg-name" style="font-size:15px;font-weight:600"></div>
+            <div id="cfg-role" style="font-size:12px;color:var(--muted)"></div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Clave API Anthropic</label>
+          <input type="password" id="cfg-api" placeholder="sk-ant-..." oninput="saveApiKey()">
+        </div>
+        <button class="btn btn-red" onclick="logout()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-body" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="stat-box"><div class="stat-num" id="st-tot" style="color:var(--green)">0</div><div class="stat-lbl">IBCs activos</div></div>
+        <div class="stat-box"><div class="stat-num" id="st-mps" style="color:var(--amber)">0</div><div class="stat-lbl">Tipos de MP</div></div>
+      </div>
+    </div>
+    <!-- SOLO ADMIN -->
+    <div id="adm-panel" style="display:none">
+      <div class="sec-title">Configuración de sesión</div>
+      <div class="card" style="margin-top:8px">
+        <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+          <div class="field">
+            <label>Tiempo de sesión (minutos)</label>
+            <input type="text" id="cfg-timeout" placeholder="Ej: 30" inputmode="numeric" oninput="saveTimeout()" style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;font-family:var(--mono);background:var(--bg);color:var(--text);width:100%">
+          </div>
+          <p style="font-size:11px;color:var(--muted);line-height:1.6">La sesión se cerrará automáticamente tras este tiempo de inactividad. Mínimo 5 min, máximo 480 min (8h).</p>
+          <div class="alert alert-ok" id="timeout-ok" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Tiempo de sesión actualizado
+          </div>
+        </div>
+      </div>
+      <div class="sec-title">Gestión de usuarios</div>
+      <div class="card">
+        <div class="card-body" style="padding:4px 14px" id="usr-list"></div>
+      </div>
+      <div class="card" style="margin-top:0">
+        <div class="card-head">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          <span>Nuevo usuario</span>
+        </div>
+        <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+          <div class="field"><label>Nombre</label><input type="text" id="nu-nom" placeholder="Ej: María García"></div>
+          <div class="field"><label>PIN (4 dígitos)</label><input type="password" id="nu-pin" placeholder="••••" maxlength="4" inputmode="numeric"></div>
+          <div class="field">
+            <label>Rol</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="rol-grid">
+              <button type="button" id="rol-std" onclick="selRol('usuario')"
+                style="padding:12px;border:2px solid var(--green);border-radius:10px;background:var(--green);color:white;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)">
+                👤 Estándar
+              </button>
+              <button type="button" id="rol-adm" onclick="selRol('admin')"
+                style="padding:12px;border:2px solid var(--border);border-radius:10px;background:var(--bg);color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans)">
+                👑 Admin
+              </button>
+            </div>
+            <input type="hidden" id="nu-rol-val" value="usuario">
+          </div>
+          <button class="btn btn-green" onclick="crearUsuario()">Crear usuario</button>
+          <div class="alert alert-ok" id="nu-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>Usuario creado</div>
+          <div class="alert alert-err" id="nu-err"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg><span id="nu-err-msg">Error</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODALES -->
+<div class="modal" id="mod-move">
+  <div class="modal-box">
+    <div class="modal-title">🔄 Mover IBC</div>
+    <div class="modal-sub" id="mod-move-sub"></div>
+    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);margin-bottom:6px">Selecciona nueva ubicación</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px" id="move-grid">
+      <button class="ubi-btn" onclick="selUbiMove('1')">1</button>
+      <button class="ubi-btn" onclick="selUbiMove('1b')">1b</button>
+      <button class="ubi-btn" onclick="selUbiMove('2')">2</button>
+      <button class="ubi-btn" onclick="selUbiMove('2b')">2b</button>
+      <button class="ubi-btn" onclick="selUbiMove('3')">3</button>
+      <button class="ubi-btn" onclick="selUbiMove('3b')">3b</button>
+      <button class="ubi-btn" onclick="selUbiMove('4')">4</button>
+      <button class="ubi-btn" onclick="selUbiMove('4b')">4b</button>
+      <button class="ubi-btn" onclick="selUbiMove('5')">5</button>
+      <button class="ubi-btn" onclick="selUbiMove('5b')">5b</button>
+      <button class="ubi-btn" onclick="selUbiMove('p2')">p2</button>
+      <button class="ubi-btn" onclick="selUbiMove('atx')">atx</button>
+    </div>
+    <input type="hidden" id="mod-move-ubi">
+    <div class="modal-btns" style="margin-top:4px">
+      <button class="btn btn-ghost" style="flex:1" onclick="closeModal('mod-move')">Cancelar</button>
+      <button class="btn btn-green" style="flex:1" id="btn-confirm-move" onclick="doMove()" disabled>Confirmar</button>
+    </div>
+  </div>
+</div>
+<div class="modal" id="mod-del">
+  <div class="modal-box">
+    <div class="modal-title">✅ Consumir IBC</div>
+    <div class="modal-sub" id="mod-del-sub"></div>
+    <p style="font-size:13px;color:var(--muted);line-height:1.6">El IBC se eliminará del stock activo y quedará en el historial.</p>
+    <div class="modal-btns">
+      <button class="btn btn-ghost" style="flex:1" onclick="closeModal('mod-del')">Cancelar</button>
+      <button class="btn btn-red" style="flex:1" onclick="doConsume()">Sí, consumir</button>
+    </div>
+  </div>
+</div>
+
+<!-- CÁMARA VIVA -->
+<div class="cam-wrap" id="cam-wrap">
+  <div class="cam-view">
+    <video id="cam-video" autoplay playsinline></video>
+    <canvas id="cam-canvas" style="display:none"></canvas>
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
+      <div class="cam-frame">
+        <div class="cam-corner tl"></div>
+        <div class="cam-corner tr"></div>
+        <div class="cam-corner bl"></div>
+        <div class="cam-corner br"></div>
+        <div class="cam-prog-wrap" id="cam-prog-wrap" style="display:none">
+          <div class="cam-prog" id="cam-prog"></div>
+        </div>
+      </div>
+    </div>
+    <div class="cam-hint"><span id="cam-hint">Enfoca la etiqueta del IBC</span></div>
+  </div>
+  <div class="cam-bar">
+    <button class="cam-close" onclick="closeCam()">✕</button>
+    <div class="cam-status" id="cam-status"></div>
+    <button class="cam-shoot" onclick="shootManual()"><div class="cam-shoot-inner"></div></button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// SUPABASE
+// ══════════════════════════════════════════════════════
+const SB = 'https://xmtpfyzniopzxtrioaqi.supabase.co';
+const SK = 'sb_publishable_jcwMyoDFJT6dH88g9ndDFw_T_cJPmaH';
+const H = () => ({ 'apikey': SK, 'Authorization': 'Bearer ' + SK, 'Content-Type': 'application/json' });
+
+async function sbGet(t, q='') {
+  const r = await fetch(`${SB}/rest/v1/${t}?${q}&order=created_at.desc`, { headers: H() });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function sbPost(t, d) {
+  const r = await fetch(`${SB}/rest/v1/${t}`, { method:'POST', headers:{ ...H(), 'Prefer':'return=representation' }, body:JSON.stringify(d) });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function sbPatch(t, id, d) {
+  const r = await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`, { method:'PATCH', headers:{ ...H(), 'Prefer':'return=representation' }, body:JSON.stringify(d) });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+async function sbDel(t, id) {
+  const r = await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`, { method:'DELETE', headers: H() });
+  if (!r.ok) throw new Error(await r.text());
+}
+
+// ══════════════════════════════════════════════════════
+// SESSION
+// ══════════════════════════════════════════════════════
+const COLORS = ['#1a9e6f','#e07b2a','#d94040','#6b48d6','#1a7bc4'];
+let _session = null;
+let _pin = '';
+
+function getTimeout() {
+  try { return parseInt(localStorage.getItem('_timeout')||'30'); } catch { return 30; }
+}
+function saveTimeout() {
+  const val = Math.min(480, Math.max(5, parseInt(document.getElementById('cfg-timeout').value)||30));
+  localStorage.setItem('_timeout', val);
+  document.getElementById('cfg-timeout').value = val;
+  show('timeout-ok'); setTimeout(()=>hide('timeout-ok'), 2000);
+}
+function loadSession() {
+  try {
+    const raw = localStorage.getItem('_sess');
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    // Check expiry
+    const mins = getTimeout();
+    const lastActive = data._lastActive || 0;
+    if (Date.now() - lastActive > mins * 60 * 1000) {
+      localStorage.removeItem('_sess');
+      return null;
+    }
+    return data;
+  } catch { return null; }
+}
+function saveSession(u) {
+  const data = { ...u, _lastActive: Date.now() };
+  localStorage.setItem('_sess', JSON.stringify(data));
+  _session = u;
+}
+function touchSession() {
+  if (!_session) return;
+  const raw = localStorage.getItem('_sess');
+  if (!raw) return;
+  try {
+    const data = JSON.parse(raw);
+    data._lastActive = Date.now();
+    localStorage.setItem('_sess', JSON.stringify(data));
+  } catch {}
+}
+function clearSession() { localStorage.removeItem('_sess'); _session = null; }
+function getApiKey() { try { return JSON.parse(localStorage.getItem('_cfg')||'{}').apikey||''; } catch { return ''; } }
+function saveApiKey() { localStorage.setItem('_cfg', JSON.stringify({ apikey: document.getElementById('cfg-api').value })); }
+
+// ══════════════════════════════════════════════════════
+// LOGIN
+// ══════════════════════════════════════════════════════
+function pinPress(d) {
+  if (!d || _pin.length >= 4) return;
+  _pin += d;
+  updDots();
+  if (_pin.length === 4) setTimeout(tryLogin, 150);
+}
+function pinDel() { _pin = _pin.slice(0,-1); updDots(); }
+function updDots() {
+  for (let i=0;i<4;i++) document.getElementById('pd'+i).classList.toggle('filled', i < _pin.length);
+}
+async function tryLogin() {
+  try {
+    const users = await sbGet('usuarios','');
+    const u = users.find(x => x.pin === _pin);
+    if (u) {
+      saveSession(u);
+      document.getElementById('login-wrap').style.display = 'none';
+      applySession(u);
+      startPolling();
+    } else {
+      document.getElementById('login-err').style.display = 'block';
+      _pin = ''; updDots();
+    }
+  } catch(e) {
+    // Fallback: check default admin
+    if (_pin === '1234') {
+      const u = { id:1, nombre:'Administrador', pin:'1234', rol:'admin', color:COLORS[0] };
+      saveSession(u);
+      document.getElementById('login-wrap').style.display = 'none';
+      applySession(u);
+      startPolling();
+    } else {
+      document.getElementById('login-err').style.display = 'block';
+      _pin = ''; updDots();
+    }
+  }
+}
+async function applySession(u) {
+  _session = u;
+  const ini = u.nombre.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+  document.getElementById('hdr-user').textContent = u.nombre;
+  document.getElementById('cfg-av').textContent = ini;
+  document.getElementById('cfg-av').style.background = u.color || COLORS[0];
+  document.getElementById('cfg-name').textContent = u.nombre;
+  document.getElementById('cfg-role').textContent = u.rol === 'admin' ? '👑 Administrador' : '👤 Usuario estándar';
+  document.getElementById('cfg-api').value = getApiKey();
+  document.getElementById('adm-panel').style.display = u.rol === 'admin' ? 'block' : 'none';
+  if (u.rol === 'admin') {
+    renderUsers();
+    document.getElementById('cfg-timeout').value = getTimeout();
+  }
+  updStats();
+  renderKanban();
+}
+function logout() {
+  clearSession();
+  _pin = ''; updDots();
+  document.getElementById('login-err').style.display = 'none';
+  document.getElementById('login-wrap').style.display = 'flex';
+  stopPolling();
+}
+
+// ══════════════════════════════════════════════════════
+// NAV
+// ══════════════════════════════════════════════════════
+const SCREENS = ['reg','bus','his','kan','cfg'];
+function goScreen(id, btn) {
+  SCREENS.forEach(s => {
+    const el = document.getElementById('sc-'+s);
+    el.classList.remove('active');
+    el.style.display = 'none';
+  });
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const sc = document.getElementById('sc-'+id);
+  sc.style.display = 'flex';
+  sc.classList.add('active');
+  btn.classList.add('active');
+  if (id==='his') renderHist();
+  if (id==='kan') { kanView('home'); renderKanban(); }
+  if (id==='cfg') { updStats(); if (_session?.rol==='admin') renderUsers(); }
+}
+
+// ══════════════════════════════════════════════════════
+// CÁMARA VIVA
+// ══════════════════════════════════════════════════════
+let _stream=null, _progInt=null, _counting=false;
+
+async function abrirCamara() {
+  try {
+    _stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment', width:{ideal:1920}, height:{ideal:1080} } });
+    document.getElementById('cam-video').srcObject = _stream;
+    document.getElementById('cam-wrap').classList.add('open');
+    startCount();
+  } catch(e) {
+    document.getElementById('cam-file').click();
+  }
+}
+function startCount() {
+  if (_counting) return;
+  _counting = true;
+  let p = 0;
+  document.getElementById('cam-prog-wrap').style.display = 'block';
+  document.getElementById('cam-hint').textContent = 'Mantén la etiqueta enfocada...';
+  _progInt = setInterval(() => {
+    p += 2;
+    document.getElementById('cam-prog').style.width = p + '%';
+    if (p >= 100) { clearInterval(_progInt); _counting = false; capture(); }
+  }, 40);
+}
+function shootManual() {
+  if (_progInt) clearInterval(_progInt);
+  _counting = false;
+  capture();
+}
+function capture() {
+  const v = document.getElementById('cam-video');
+  const c = document.getElementById('cam-canvas');
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext('2d').drawImage(v,0,0);
+  document.getElementById('cam-hint').textContent = '📸 Procesando con IA...';
+  c.toBlob(async blob => { await closeCam(); await processBlob(blob); }, 'image/jpeg', 0.92);
+}
+async function closeCam() {
+  if (_progInt) clearInterval(_progInt);
+  _counting = false;
+  if (_stream) { _stream.getTracks().forEach(t=>t.stop()); _stream=null; }
+  document.getElementById('cam-wrap').classList.remove('open');
+  document.getElementById('cam-prog').style.width = '0%';
+  document.getElementById('cam-prog-wrap').style.display = 'none';
+  document.getElementById('cam-hint').textContent = 'Enfoca la etiqueta del IBC';
+}
+async function processBlob(blob) {
+  document.getElementById('ai-spin').style.display = 'flex';
+  resetFields();
+  const reader = new FileReader();
+  reader.onload = async () => await callAI(reader.result.split(',')[1], blob.type||'image/jpeg');
+  reader.readAsDataURL(blob);
+}
+function onFileChange(e) {
+  const f = e.target.files[0];
+  if (!f) return;
+  document.getElementById('ai-spin').style.display = 'flex';
+  resetFields();
+  const r = new FileReader();
+  r.onload = async () => await callAI(r.result.split(',')[1], f.type);
+  r.readAsDataURL(f);
+  e.target.value = '';
+}
+
+// ══════════════════════════════════════════════════════
+// AI
+// ══════════════════════════════════════════════════════
+async function callAI(b64, mime) {
+  // Opción A: OCR del navegador (sin API key)
+  const key = getApiKey();
+  if (key) {
+    await callClaudeAI(b64, mime);
+  } else {
+    await callBrowserOCR(b64, mime);
+  }
+}
+
+async function callClaudeAI(b64, mime) {
+  try {
+    const key = getApiKey();
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:500,
+        messages:[{ role:'user', content:[
+          { type:'image', source:{ type:'base64', media_type:mime, data:b64 } },
+          { type:'text', text:`Eres OCR para etiquetas de almacén IBC. Extrae código MP (número grande arriba, 4 dígitos) y fecha de recepción (formato DD/MM/AAAA).
+Devuelve SOLO JSON sin texto extra:
+{"codigo":"XXXX","fecha":"DD/MM/AAAA"}
+Si no ves un campo, déjalo vacío "".` }
+        ]}]
+      })
+    });
+    const data = await res.json();
+    document.getElementById('ai-spin').style.display = 'none';
+    if (data.error) { showErr('Error IA: '+data.error.message); return; }
+    const txt = data.content.map(b=>b.text||'').join('');
+    const obj = JSON.parse(txt.replace(/```json|```/g,'').trim());
+    if (obj.codigo) setField('f-cod', obj.codigo, 'tag-cod');
+    if (obj.fecha)  setField('f-fec', obj.fecha,  'tag-fec');
+    checkBtn();
+  } catch(e) {
+    document.getElementById('ai-spin').style.display = 'none';
+    showErr('Error IA: '+e.message);
+  }
+}
+
+async function callBrowserOCR(b64, mime) {
+  try {
+    document.getElementById('ai-spin').querySelector('p').textContent = 'Leyendo etiqueta con OCR...';
+    await ocrSpace(b64, mime);
+  } catch(e) {
+    document.getElementById('ai-spin').style.display = 'none';
+    showErr('Error OCR: ' + e.message + '. Introduce los datos manualmente.');
+  }
+}
+
+async function ocrSpace(b64, mime) {
+  const formData = new FormData();
+  formData.append('base64Image', 'data:' + mime + ';base64,' + b64);
+  formData.append('apikey', 'K82076226488957');
+  formData.append('language', 'spa');
+  formData.append('isOverlayRequired', 'false');
+  formData.append('detectOrientation', 'true');
+  formData.append('scale', 'true');
+  formData.append('OCREngine', '2'); // Engine 2 es mejor para números
+
+  const res = await fetch('https://api.ocr.space/parse/image', {
+    method: 'POST',
+    body: formData
+  });
+
+  const data = await res.json();
+  document.getElementById('ai-spin').style.display = 'none';
+
+  if (data.IsErroredOnProcessing) {
+    showErr('Error OCR.space: ' + (data.ErrorMessage||'desconocido'));
+    return;
+  }
+
+  const texto = data.ParsedResults?.[0]?.ParsedText || '';
+  console.log('OCR.space texto:', texto);
+  extraerDatosTexto(texto);
+}
+
+function extraerDatosTexto(texto) {
+  // Buscar código de 4 dígitos (número grande = primero que aparece solo en línea)
+  const lineas = texto.split(/[\n\r]+/).map(l => l.trim()).filter(l => l);
+  
+  let codigo = '';
+  let fecha = '';
+
+  // Buscar código: línea que sea exactamente 4 dígitos
+  for (const l of lineas) {
+    const m = l.match(/^(\d{4})$/);
+    if (m) { codigo = m[1]; break; }
+  }
+  // Si no, buscar 4 dígitos al inicio de línea solos
+  if (!codigo) {
+    for (const l of lineas) {
+      const m = l.match(/^(\d{4})\b/);
+      if (m) { codigo = m[1]; break; }
+    }
+  }
+
+  // Buscar fecha DD/MM/AAAA o D/M/AAAA
+  const fechaMatch = texto.match(/(\d{1,2}[\/-]\d{1,2}[\/-]\d{4})/);
+  if (fechaMatch) {
+    fecha = fechaMatch[1].replace(/-/g,'/');
+    // Normalizar a DD/MM/AAAA
+    const parts = fecha.split('/');
+    if (parts.length === 3) {
+      fecha = parts[0].padStart(2,'0') + '/' + parts[1].padStart(2,'0') + '/' + parts[2];
+    }
+  }
+
+  if (codigo) setField('f-cod', codigo, 'tag-cod');
+  if (fecha)  setField('f-fec', fecha,  'tag-fec');
+
+  if (!codigo && !fecha) {
+    showErr('No se pudo leer la etiqueta. Introduce los datos manualmente.');
+  }
+  checkBtn();
+}
+function setField(id, val, tagId) {
+  const el = document.getElementById(id);
+  el.value = val; el.classList.add('ai');
+  document.getElementById(tagId).style.display = 'inline-block';
+}
+function resetFields() {
+  ['f-cod','f-fec'].forEach(id => { const el=document.getElementById(id); el.value=''; el.classList.remove('ai'); });
+  ['tag-cod','tag-fec'].forEach(id => document.getElementById(id).style.display='none');
+}
+
+// ══════════════════════════════════════════════════════
+// REGISTRAR
+// ══════════════════════════════════════════════════════
+// ── UBICACION GRID ────────────────────────────────────────────────────
+function selUbi(ubi) {
+  document.getElementById('f-ubi').value = ubi;
+  document.querySelectorAll('#sc-reg .ubi-btn').forEach(b => {
+    b.classList.toggle('selected', b.textContent.trim() === ubi);
+  });
+  checkBtn();
+}
+
+function selUbiMove(ubi) {
+  document.getElementById('mod-move-ubi').value = ubi;
+  document.querySelectorAll('#move-grid .ubi-btn').forEach(b => {
+    b.classList.toggle('selected', b.textContent.trim() === ubi);
+  });
+  document.getElementById('btn-confirm-move').disabled = false;
+}
+
+function selUbiSearch(ubi) {
+  // Highlight selected
+  document.querySelectorAll('#bus-ubi .ubi-btn').forEach(b => {
+    b.classList.toggle('selected', b.textContent === ubi);
+  });
+  buscarPorUbi(ubi);
+}
+
+function closeQR() {}
+function checkBtn() {
+  const ok = document.getElementById('f-cod').value.trim() && document.getElementById('f-fec').value.trim() && document.getElementById('f-ubi').value.trim();
+  document.getElementById('btn-save').disabled = !ok;
+}
+async function guardar() {
+  const row = {
+    codigo: document.getElementById('f-cod').value.trim(),
+    fecha:  document.getElementById('f-fec').value.trim(),
+    ubicacion: document.getElementById('f-ubi').value.trim(),
+    ibc: 'IBC'+String(Math.floor(Math.random()*9000)+1000),
+    usuario: _session?.nombre || 'Operario',
+    estado: 'activo',
+    timestamp: new Date().toLocaleString('es-ES')
+  };
+  try {
+    await sbPost('registros', row);
+    show('al-ok'); setTimeout(()=>hide('al-ok'),3000);
+    ['f-cod','f-fec','f-ubi'].forEach(id => { const el=document.getElementById(id); el.value=''; el.classList.remove('ai'); });
+    ['tag-cod','tag-fec'].forEach(id => document.getElementById(id).style.display='none');
+    document.getElementById('btn-save').disabled = true;
+    updStats();
+  } catch(e) { showErr('Error al guardar: '+e.message); }
+}
+
+// ══════════════════════════════════════════════════════
+// BUSCAR FIFO
+// ══════════════════════════════════════════════════════
+// ── BUSCAR TABS ───────────────────────────────────────────────────────
+function busTab(t) {
+  const isCod = t === 'cod';
+  document.getElementById('bus-cod').style.display = isCod ? 'block' : 'none';
+  document.getElementById('bus-ubi').style.display = isCod ? 'none' : 'flex';
+  document.getElementById('tab-cod').style.background = isCod ? 'var(--green)' : 'var(--surface)';
+  document.getElementById('tab-cod').style.color = isCod ? 'white' : 'var(--muted)';
+  document.getElementById('tab-cod').style.border = isCod ? 'none' : '1px solid var(--border)';
+  document.getElementById('tab-ubi').style.background = isCod ? 'var(--surface)' : 'var(--green)';
+  document.getElementById('tab-ubi').style.color = isCod ? 'var(--muted)' : 'white';
+  document.getElementById('tab-ubi').style.border = isCod ? '1px solid var(--border)' : 'none';
+  // grid always visible
+}
+
+
+async function buscarPorUbi(ubi) {
+  const cont = document.getElementById('fifo-ubi-res');
+  if (!ubi) { cont.innerHTML = ''; return; }
+  cont.innerHTML = '<div class="empty"><div class="spinner" style="margin:0 auto"></div></div>';
+  try {
+    const all = await sbGet('registros','estado=eq.activo');
+    // Filter by location, sort by codigo then by fecha (FIFO)
+    const found = all
+      .filter(r => r.ubicacion === ubi)
+      .sort((a,b) => {
+        if (a.codigo < b.codigo) return -1;
+        if (a.codigo > b.codigo) return 1;
+        return parseDate(a.fecha) - parseDate(b.fecha);
+      });
+    if (!found.length) {
+      cont.innerHTML = `<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>Sin stock en ${ubi}</div>`;
+      return;
+    }
+    // Group by codigo
+    const grupos = {};
+    found.forEach(r => {
+      if (!grupos[r.codigo]) grupos[r.codigo] = [];
+      grupos[r.codigo].push(r);
+    });
+    cont.innerHTML = Object.keys(grupos).sort().map(cod => {
+      const items = grupos[cod];
+      const cards = items.map((r,i) => {
+        const ibc = (r.ibc||'').replace(/"/g,'&quot;');
+        const ubi = (r.ubicacion||'').replace(/"/g,'&quot;');
+        const top = i===0 ? 'first' : 'next';
+        const badge = i===0 ? 'PRIMERO' : '+'+i;
+        return [
+          '<div class="fifo-card" style="margin-bottom:6px">',
+            '<div class="fifo-top '+top+'">',
+              '<span class="fifo-badge">'+badge+'</span>',
+              '<span class="fifo-name">MP '+r.codigo+'</span>',
+            '</div>',
+            '<div class="fifo-body">',
+              '<div class="fifo-row"><span class="lbl">📅 Fecha recepción</span><span class="val">'+r.fecha+'</span></div>',
+              '<div class="fifo-row"><span class="lbl">👤 Registrado por</span><span class="val">'+r.usuario+'</span></div>',
+              '<div class="fifo-actions">',
+                '<button class="btn-move" onclick="openMove('+r.id+',&quot;'+r.codigo+'&quot;,&quot;'+ubi+'&quot;)">🔄 Mover</button>',
+                '<button class="btn-consume" onclick="openConsume('+r.id+',&quot;'+r.codigo+'&quot;,&quot;'+ubi+'&quot;)">✅ Consumir</button>',
+              '</div>',
+            '</div>',
+          '</div>'
+        ].join('');
+      }).join('');
+      return '<div style="margin-bottom:12px">' +
+        '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px;padding:0 2px">MP ' + cod + '</div>' +
+        cards +
+      '</div>';
+    }).join('');
+  } catch(e) {
+    cont.innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
+}
+
+async function buscar() {
+  const q = document.getElementById('q-bus').value.trim().toLowerCase();
+  const cont = document.getElementById('fifo-res');
+  if (!q) { cont.innerHTML=''; return; }
+  cont.innerHTML = '<div class="empty"><div class="spinner" style="margin:0 auto"></div></div>';
+  try {
+    const all = await sbGet('registros','estado=eq.activo');
+    const found = all.filter(r => (r.codigo||'').toString().trim().toLowerCase() === q || (r.codigo||'').toString().trim().toLowerCase().includes(q)).sort((a,b)=>parseDate(a.fecha)-parseDate(b.fecha));
+    if (!found.length) { cont.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>Sin resultados para "${q}"</div>`; return; }
+    cont.innerHTML = found.map((r,i) => `
+      <div class="fifo-card">
+        <div class="fifo-top ${i===0?'first':'next'}">
+          <span class="fifo-badge">${i===0?'COGER PRIMERO':'Siguiente'}</span>
+          <span class="fifo-name">MP ${r.codigo}</span>
+        </div>
+        <div class="fifo-body">
+          <div class="fifo-row"><span class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>Ubicación</span><span class="val">${r.ubicacion}</span></div>
+          <div class="fifo-row"><span class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Fecha recepción</span><span class="val">${r.fecha}</span></div>
+          <div class="fifo-row"><span class="lbl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Registrado por</span><span class="val">${r.usuario}</span></div>
+          <div class="fifo-actions">
+            <button class="btn-move" onclick="openMove(${r.id},'${r.codigo}','${r.ubicacion}')">🔄 Mover</button>
+            <button class="btn-consume" onclick="openConsume(${r.id},'${r.codigo}','${r.ubicacion}')">✅ Consumir</button>
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(e) { cont.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
+}
+
+// ══════════════════════════════════════════════════════
+// MOVER / CONSUMIR
+// ══════════════════════════════════════════════════════
+let _tid = null;
+function openMove(id,codigo,ubi) {
+  _tid=id;
+  document.getElementById('mod-move-sub').textContent = 'MP '+codigo+' · Actualmente en '+ubi;
+  document.getElementById('mod-move-ubi').value = '';
+  document.getElementById('btn-confirm-move').disabled = true;
+  document.querySelectorAll('#move-grid .ubi-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('mod-move').classList.add('open');
+}
+function openConsume(id,codigo,ubi) { _tid=id; document.getElementById('mod-del-sub').textContent='MP '+codigo+' · '+ubi; document.getElementById('mod-del').classList.add('open'); }
+async function doMove() {
+  const u = document.getElementById('mod-move-ubi').value.trim();
+  if (!u) return;
+  try { await sbPatch('registros',_tid,{ubicacion:u}); closeModal('mod-move'); buscar(); } catch(e) { showErr(e.message); }
+}
+async function doConsume() {
+  try { await sbPatch('registros',_tid,{estado:'consumido',consumido_por:_session?.nombre||'',consumido_ts:new Date().toLocaleString('es-ES')}); closeModal('mod-del'); buscar(); } catch(e) { showErr(e.message); }
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); _tid=null; }
+document.addEventListener('click', e => { if (e.target.classList.contains('modal')) closeModal(e.target.id); });
+
+// ══════════════════════════════════════════════════════
+// HISTORIAL
+// ══════════════════════════════════════════════════════
+async function renderHist() {
+  const c = document.getElementById('hist-body');
+  c.innerHTML = '<div class="empty"><div class="spinner" style="margin:0 auto"></div></div>';
+  try {
+    const data = await sbGet('registros','');
+    if (!data.length) { c.innerHTML='<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>Sin registros</div>'; return; }
+    c.innerHTML = data.slice(0,30).map(r=>`
+      <div class="hist-item">
+        <div class="hist-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg></div>
+        <div style="flex:1"><div class="hist-top">MP ${r.codigo}</div><div class="hist-bot">${r.ubicacion} · ${r.fecha} · <span style="color:${r.estado==='consumido'?'var(--red)':'var(--green)'}">${r.estado}</span></div></div>
+        <div class="hist-right">${r.usuario}<br>${(r.timestamp||'').split(',')[1]||''}</div>
+      </div>`).join('');
+  } catch(e) { c.innerHTML=`<div class="empty">Error: ${e.message}</div>`; }
+}
+
+// ══════════════════════════════════════════════════════
+// KANBAN
+// ══════════════════════════════════════════════════════
+function kanView(v) {
+  const home = document.getElementById('kan-home');
+  const add  = document.getElementById('kan-add');
+  const rep  = document.getElementById('kan-rep');
+  if (home) home.style.display = v==='home' ? 'flex' : 'none';
+  if (add)  add.style.display  = v==='add'  ? 'flex' : 'none';
+  if (rep)  rep.style.display  = v==='rep'  ? 'flex' : 'none';
+  if (v==='rep') renderKanban();
+}
+
+function checkKanban() { document.getElementById('k-btn').disabled = !document.getElementById('k-cod').value.trim(); }
+async function crearKanban() {
+  const cod = document.getElementById('k-cod').value.trim();
+  const com = document.getElementById('k-com').value.trim();
+  try {
+    await sbPost('kanban',{ codigo:cod, comentario:com, estado:'pendiente', usuario:_session?.nombre||'Operario', timestamp:new Date().toLocaleString('es-ES') });
+    document.getElementById('k-cod').value=''; document.getElementById('k-com').value=''; document.getElementById('k-btn').disabled=true;
+    show('k-ok'); setTimeout(()=>{ hide('k-ok'); kanView('home'); },2000);
+    renderKanban();
+  } catch(e) { showErr(e.message); }
+}
+async function renderKanban() {
+  try {
+    const all = await sbGet('kanban','');
+    const pend = all.filter(k => k.estado === 'pendiente');
+
+    // Completadas hoy — comparar fecha DD/MM/AAAA
+    const hoyArr = new Date().toLocaleDateString('es-ES').split('/');
+    const hoyStr = hoyArr[0].padStart(2,'0') + '/' + hoyArr[1].padStart(2,'0') + '/' + hoyArr[2];
+    const done = all.filter(k => k.estado === 'completada' && (k.completado_ts||'').startsWith(hoyStr));
+
+    // Actualizar badges
+    const badge = document.getElementById('k-badge');
+    if (badge) { badge.textContent = pend.length; badge.style.display = pend.length ? 'inline-block' : 'none'; }
+    const navBadge = document.getElementById('nav-k-badge');
+    if (navBadge) { navBadge.textContent = pend.length; navBadge.style.display = pend.length ? 'inline-block' : 'none'; }
+
+    // Pendientes
+    const pEl = document.getElementById('k-pend');
+    if (pEl) {
+      if (!pend.length) {
+        pEl.innerHTML = '<div class="empty" style="padding:16px">Sin solicitudes pendientes</div>';
+      } else {
+        pEl.innerHTML = pend.map(k => `
+          <div class="k-card">
+            <div class="k-top pend">
+              <span class="k-badge">Pendiente</span>
+              <span class="k-code">${k.codigo}</span>
+              <span style="font-size:12px;color:#7a3d0a;flex:1;margin-left:4px">${k.comentario||''}</span>
+            </div>
+            <div class="k-body">
+              <span class="k-user">${k.usuario} · ${(k.timestamp||'').split(',')[1]||''}</span>
+              <div style="display:flex;gap:6px">
+                <button class="btn-done" onclick="completarK(${k.id})">✓ Listo</button>
+                <button onclick="eliminarK(${k.id})" style="padding:6px 10px;background:var(--red-light);color:var(--red);border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans)">✕ Eliminar</button>
+              </div>
+            </div>
+          </div>`).join('');
+      }
+    }
+
+    // Completadas hoy
+    const dEl = document.getElementById('k-done');
+    if (dEl) {
+      if (!done.length) {
+        dEl.innerHTML = '<div class="empty" style="font-size:12px;padding:12px">Ninguna completada hoy</div>';
+      } else {
+        dEl.innerHTML = done.map(k => `
+          <div class="k-card">
+            <div class="k-top done">
+              <span class="k-badge">Completada</span>
+              <span class="k-code">${k.codigo}</span>
+              <span style="font-size:12px;color:var(--green-dark);flex:1;margin-left:4px">${k.comentario||''}</span>
+            </div>
+            <div class="k-body">
+              <span class="k-user">Por ${k.completado_por||''}</span>
+            </div>
+          </div>`).join('');
+      }
+    }
+  } catch(e) {
+    console.error('renderKanban error:', e);
+  }
+}
+async function completarK(id) {
+  try { await sbPatch('kanban',id,{estado:'completada',completado_por:_session?.nombre||'Operario',completado_ts:new Date().toLocaleString('es-ES')}); renderKanban(); } catch(e) { showErr(e.message); }
+}
+async function eliminarK(id) {
+  try { await sbDel('kanban',id); renderKanban(); } catch(e) { showErr(e.message); }
+}
+
+// ══════════════════════════════════════════════════════
+// USUARIOS (ADMIN)
+// ══════════════════════════════════════════════════════
+async function renderUsers() {
+  try {
+    const users = await sbGet('usuarios','');
+    document.getElementById('usr-list').innerHTML = users.map(u=>`
+      <div class="user-item">
+        <div class="u-avatar" style="background:${u.color||COLORS[0]}">${u.nombre.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)}</div>
+        <div style="flex:1"><div class="u-name">${u.nombre} ${u.id==_session?.id?'<span style="font-size:10px;color:var(--green)">(tú)</span>':''}</div><div class="u-role"><span class="${u.rol==='admin'?'badge-admin':'badge-user'}">${u.rol==='admin'?'Admin':'Estándar'}</span></div></div>
+        ${u.id!=_session?.id?`<button class="btn-del" onclick="delUser(${u.id})">Eliminar</button>`:''}
+      </div>`).join('');
+  } catch(e) {}
+}
+function selRol(rol) {
+  document.getElementById('nu-rol-val').value = rol;
+  const std = document.getElementById('rol-std');
+  const adm = document.getElementById('rol-adm');
+  if (rol === 'usuario') {
+    std.style.background = 'var(--green)'; std.style.color = 'white'; std.style.borderColor = 'var(--green)';
+    adm.style.background = 'var(--bg)'; adm.style.color = 'var(--muted)'; adm.style.borderColor = 'var(--border)';
+  } else {
+    adm.style.background = 'var(--red)'; adm.style.color = 'white'; adm.style.borderColor = 'var(--red)';
+    std.style.background = 'var(--bg)'; std.style.color = 'var(--muted)'; std.style.borderColor = 'var(--border)';
+  }
+}
+
+async function crearUsuario() {
+  const nom = document.getElementById('nu-nom').value.trim();
+  const pin = document.getElementById('nu-pin').value.trim();
+  const rol = document.getElementById('nu-rol-val').value || 'usuario';
+  const errEl = document.getElementById('nu-err');
+  const errMsg = document.getElementById('nu-err-msg');
+  errEl.style.display='none';
+  if (!nom) { errMsg.textContent='Introduce un nombre'; show('nu-err'); return; }
+  if (!/^\d{4}$/.test(pin)) { errMsg.textContent='El PIN debe tener 4 dígitos'; show('nu-err'); return; }
+  try {
+    const users = await sbGet('usuarios','');
+    if (users.find(u=>u.nombre.toLowerCase()===nom.toLowerCase())) { errMsg.textContent='Ya existe ese usuario'; show('nu-err'); return; }
+    await sbPost('usuarios',{ nombre:nom, pin, rol, color:COLORS[users.length%COLORS.length] });
+    document.getElementById('nu-nom').value=''; document.getElementById('nu-pin').value=''; selRol('usuario');
+    show('nu-ok'); setTimeout(()=>hide('nu-ok'),2500);
+    renderUsers();
+  } catch(e) { errMsg.textContent='Error: '+e.message; show('nu-err'); }
+}
+async function delUser(id) {
+  try { await sbDel('usuarios',id); renderUsers(); } catch(e) { alert('Error: '+e.message); }
+}
+
+// ══════════════════════════════════════════════════════
+// STATS + POLLING + SYNC
+// ══════════════════════════════════════════════════════
+async function updStats() {
+  try {
+    const data = await sbGet('registros','estado=eq.activo');
+    document.getElementById('st-tot').textContent = data.length;
+    document.getElementById('st-mps').textContent = new Set(data.map(d=>d.codigo)).size;
+  } catch {}
+}
+let _poll = null;
+function startPolling() {
+  stopPolling();
+  _poll = setInterval(async () => {
+    // Check session expiry
+    const s = loadSession();
+    if (!s) { logout(); return; }
+    const active = SCREENS.find(s => document.getElementById('sc-'+s)?.classList.contains('active'));
+    if (active==='his') await renderHist();
+    if (active==='bus') { const q=document.getElementById('q-bus').value.trim(); if(q) await buscar(); }
+    if (active==='kan') await renderKanban();
+  }, 15000);
+}
+function stopPolling() { if(_poll) clearInterval(_poll); }
+async function syncNow() {
+  const lbl = document.getElementById('sync-lbl');
+  lbl.textContent = '...';
+  const active = SCREENS.find(s => document.getElementById('sc-'+s)?.classList.contains('active'));
+  if (active==='his') await renderHist();
+  if (active==='bus') { const q=document.getElementById('q-bus').value.trim(); if(q) await buscar(); }
+  if (active==='kan') await renderKanban();
+  await updStats();
+  lbl.textContent = new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'});
+}
+
+// ══════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════
+function show(id) { document.getElementById(id).style.display='flex'; }
+function hide(id) { document.getElementById(id).style.display='none'; }
+function showErr(msg) { document.getElementById('al-err-msg').textContent=msg; show('al-err'); setTimeout(()=>hide('al-err'),5000); }
+
+// ══════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════
+window.addEventListener('load', async () => {
+  const s = loadSession();
+  if (s) {
+    document.getElementById('login-wrap').style.display = 'none';
+    await applySession(s);
+    startPolling();
+  }
+});
+// Reset inactivity timer on any interaction
+document.addEventListener('click', () => { if (_session) touchSession(); });
+document.addEventListener('touchstart', () => { if (_session) touchSession(); });
+</script>
+</body>
+</html>
